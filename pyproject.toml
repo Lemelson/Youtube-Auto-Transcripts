@@ -17,11 +17,6 @@ dependencies = [
   "requests>=2.31.0"
 ]
 
-[project.optional-dependencies]
-whisper = [
-  "faster-whisper>=1.0.0"
-]
-
 [project.scripts]
 youtube-auto-transcripts = "youtube_auto_transcripts.cli:main"
 

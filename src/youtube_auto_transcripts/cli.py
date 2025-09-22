@@ -13,7 +13,7 @@ from .config import (
     parse_lang_priority,
 )
 from .processor import process_videos
-from .writer import OutputArtifacts, write_outputs
+from .writer import write_outputs
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -48,20 +48,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--comments",
         dest="comment_limit",
         type=int,
-        default=0,
-        help="Number of top comments to fetch (0 disables comment retrieval)",
-    )
-    parser.add_argument(
-        "--fallback-whisper",
-        dest="fallback_whisper",
-        action="store_true",
-        help="Invoke faster-whisper fallback if Parakeet fails",
-    )
-    parser.add_argument(
-        "--whisper-model",
-        dest="whisper_model",
         default=None,
-        help="Model size for faster-whisper fallback (default: small)",
+        help="Number of top comments to fetch (default: 20 when YOUTUBE_API_KEY is set, otherwise 0)",
+    )
+    parser.add_argument(
+        "--debug",
+        dest="debug",
+        action="store_true",
+        help="Keep auxiliary artifacts (.json, .log) and temporary audio on failure",
     )
     parser.add_argument(
         "--lang-priority",
@@ -86,7 +80,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def validate_args(args: argparse.Namespace) -> None:
-    if args.comment_limit < 0:
+    if args.comment_limit is not None and args.comment_limit < 0:
         raise SystemExit("--comments must be zero or a positive integer")
     if args.retries < 1:
         raise SystemExit("--retries must be >= 1")
@@ -100,18 +94,19 @@ def build_options(args: argparse.Namespace) -> CLIOptions:
     output_dir = args.outdir.expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    whisper_model = args.whisper_model or "small"
+    comment_limit = args.comment_limit
+    if comment_limit is None:
+        comment_limit = 20 if os.environ.get("YOUTUBE_API_KEY") else 0
 
     return CLIOptions(
         urls=list(urls),
         url_file=args.url_file,
         read_stdin=args.read_stdin,
         output_dir=output_dir,
-        comment_limit=args.comment_limit,
-        fallback_whisper=args.fallback_whisper,
-        whisper_model=whisper_model,
+        comment_limit=comment_limit,
         lang_priority=parse_lang_priority(args.lang_priority),
         parakeet_model=args.parakeet_model,
+        debug=args.debug,
         retries=args.retries,
     )
 

@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable, List
+from typing import Iterable, List, Optional
 
 from .config import RunContext, VideoProcessingResult
 
@@ -12,12 +12,17 @@ from .config import RunContext, VideoProcessingResult
 @dataclass
 class OutputArtifacts:
     text_path: Path
-    json_path: Path
-    log_path: Path
+    json_path: Optional[Path]
+    log_path: Optional[Path]
 
     @property
     def all_paths(self) -> List[Path]:
-        return [self.text_path, self.json_path, self.log_path]
+        paths: List[Path] = [self.text_path]
+        if self.json_path:
+            paths.append(self.json_path)
+        if self.log_path:
+            paths.append(self.log_path)
+        return paths
 
 
 def write_outputs(
@@ -29,12 +34,16 @@ def write_outputs(
 
     base_name = build_base_name(context.started_at, count)
     text_path = context.output_dir / f"{base_name}.txt"
-    json_path = context.output_dir / f"{base_name}.json"
-    log_path = context.output_dir / f"{base_name}.log"
 
     text_path.write_text(render_text_report(results_list), encoding="utf-8")
-    json_path.write_text(render_json_report(context, results_list), encoding="utf-8")
-    log_path.write_text(render_log(results_list), encoding="utf-8")
+    json_path: Optional[Path] = None
+    log_path: Optional[Path] = None
+
+    if context.debug:
+        json_path = context.output_dir / f"{base_name}.json"
+        log_path = context.output_dir / f"{base_name}.log"
+        json_path.write_text(render_json_report(context, results_list), encoding="utf-8")
+        log_path.write_text(render_log(results_list), encoding="utf-8")
 
     return OutputArtifacts(text_path=text_path, json_path=json_path, log_path=log_path)
 
@@ -120,8 +129,7 @@ def render_json_report(context: RunContext, results: List[VideoProcessingResult]
         "video_count": len(results),
         "options": {
             "comment_limit": context.comment_limit,
-            "fallback_whisper": context.options.fallback_whisper,
-            "whisper_model": context.options.whisper_model if context.options.fallback_whisper else None,
+            "debug": context.debug,
             "lang_priority": context.lang_priority,
             "parakeet_model": context.options.parakeet_model,
         },

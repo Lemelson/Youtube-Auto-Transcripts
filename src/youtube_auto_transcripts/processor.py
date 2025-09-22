@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import tempfile
-from dataclasses import replace
 from pathlib import Path
 from typing import Iterable, List, Optional
 from urllib.parse import parse_qs, urlparse
@@ -79,7 +77,6 @@ def process_single_video(context: RunContext, url: str, index: int) -> VideoProc
     if not transcript_result.text:
         asr_result, temp_paths = attempt_offline_transcript(
             url=safe_url,
-            video_id=video_id,
             context=context,
             temp_dir=temp_dir,
             log_messages=log_messages,
@@ -90,36 +87,12 @@ def process_single_video(context: RunContext, url: str, index: int) -> VideoProc
             transcript_result.errors.extend(asr_result.errors)
             transcript_result.warnings.extend(asr_result.warnings)
 
-    delete_on_success = list(temp_paths)
-
-    if context.options.fallback_whisper and not transcript_result.text:
-        whisper_result = attempt_whisper_fallback(
-            audio_paths=temp_paths,
-            context=context,
-            log_messages=log_messages,
-        )
-        if whisper_result.text:
-            transcript_result = whisper_result
-            delete_on_success = list(temp_paths)
-        else:
-            transcript_result.errors.extend(whisper_result.errors)
-            transcript_result.warnings.extend(whisper_result.warnings)
-
-    if transcript_result.text:
-        for path in delete_on_success:
-            try:
-                path.unlink(missing_ok=True)
-            except OSError:
-                log_messages.append(f"[WARN] cleanup: failed to delete {path}")
-        try:
-            temp_dir.rmdir()
-        except OSError:
-            # Directory may contain files we intentionally keep on failure
-            pass
+    keep_temp_artifacts = context.debug and not transcript_result.text
+    if not keep_temp_artifacts:
+        cleanup_temp_artifacts(temp_paths, temp_dir, log_messages)
     else:
-        # Keep artifacts for debugging
         log_messages.append(
-            f"[INFO] cleanup: leaving temporary artifacts in {temp_dir} for inspection"
+            f"[INFO] cleanup: keeping temporary artifacts in {temp_dir} for inspection"
         )
 
     comments: List[dict] = []
@@ -144,7 +117,7 @@ def process_single_video(context: RunContext, url: str, index: int) -> VideoProc
         warnings=combined_warnings,
         errors=combined_errors,
         log_messages=log_messages,
-        temp_files=temp_paths,
+        temp_files=temp_paths if keep_temp_artifacts else [],
     )
 
 
@@ -277,7 +250,6 @@ def attempt_caption_transcript(
 
 def attempt_offline_transcript(
     url: str,
-    video_id: Optional[str],
     context: RunContext,
     temp_dir: Path,
     log_messages: List[str],
@@ -445,51 +417,21 @@ def run_parakeet(
     return TranscriptResult(text=text, source="parakeet")
 
 
-_whisper_model_cache = {}
-
-
-def attempt_whisper_fallback(
-    audio_paths: List[Path],
-    context: RunContext,
+def cleanup_temp_artifacts(
+    temp_paths: List[Path],
+    temp_dir: Path,
     log_messages: List[str],
-) -> TranscriptResult:
-    wav_path: Optional[Path] = None
-    for path in audio_paths:
-        if path.suffix.lower() == ".wav":
-            wav_path = path
-            break
-    if not wav_path:
-        log_messages.append(
-            "[ERROR] whisper: no WAV audio available for fallback"
-        )
-        return TranscriptResult(text=None, source="faster-whisper", errors=["no wav input for whisper"])
-
+) -> None:
+    for path in temp_paths:
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            log_messages.append(f"[WARN] cleanup: failed to delete {path}")
     try:
-        from faster_whisper import WhisperModel
-    except ImportError:
-        message = "faster-whisper is not installed"
-        log_messages.append(f"[ERROR] whisper: {message}")
-        return TranscriptResult(text=None, source="faster-whisper", errors=[message])
-
-    model_name = context.options.whisper_model
-
-    model = _whisper_model_cache.get(model_name)
-    if model is None:
-        model = WhisperModel(model_name, device="cpu", compute_type="int8_float16")
-        _whisper_model_cache[model_name] = model
-        log_messages.append(f"[INFO] whisper: loaded model '{model_name}'")
-
-    segments, _ = model.transcribe(str(wav_path), beam_size=5)
-    text_parts = [segment.text.strip() for segment in segments if segment.text.strip()]
-    text = " ".join(text_parts).strip()
-
-    if not text:
-        message = "faster-whisper produced empty transcript"
-        log_messages.append(f"[WARN] whisper: {message}")
-        return TranscriptResult(text=None, source="faster-whisper", warnings=[message])
-
-    log_messages.append("[INFO] whisper: transcription completed")
-    return TranscriptResult(text=text, source="faster-whisper")
+        temp_dir.rmdir()
+    except OSError:
+        # Directory may already be gone or contain unexpected files; that's fine.
+        pass
 
 
 def fetch_comments(

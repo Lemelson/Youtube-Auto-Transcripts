@@ -13,10 +13,9 @@ class CLIOptions:
     read_stdin: bool
     output_dir: Path
     comment_limit: int
-    fallback_whisper: bool
-    whisper_model: str
     lang_priority: List[str]
     parakeet_model: str
+    debug: bool
     retries: int = 3
 
 
@@ -79,6 +78,10 @@ class RunContext:
     @property
     def retries(self) -> int:
         return self.options.retries
+
+    @property
+    def debug(self) -> bool:
+        return self.options.debug
 
 
 def parse_lang_priority(raw: str) -> List[str]:
