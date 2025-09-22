@@ -1,0 +1,13 @@
+README.md
+pyproject.toml
+src/youtube_auto_transcripts/__init__.py
+src/youtube_auto_transcripts/cli.py
+src/youtube_auto_transcripts/config.py
+src/youtube_auto_transcripts/processor.py
+src/youtube_auto_transcripts/writer.py
+src/youtube_auto_transcripts.egg-info/PKG-INFO
+src/youtube_auto_transcripts.egg-info/SOURCES.txt
+src/youtube_auto_transcripts.egg-info/dependency_links.txt
+src/youtube_auto_transcripts.egg-info/entry_points.txt
+src/youtube_auto_transcripts.egg-info/requires.txt
+src/youtube_auto_transcripts.egg-info/top_level.txt

@@ -1,0 +1,2 @@
+[console_scripts]
+youtube-auto-transcripts = youtube_auto_transcripts.cli:main
