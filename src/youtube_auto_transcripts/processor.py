@@ -22,6 +22,15 @@ class ProcessingError(Exception):
     """Raised for errors that should be surfaced to the log but not crash the run."""
 
 
+def build_ytdlp_base_args(context: RunContext) -> List[str]:
+    args = ["yt-dlp"]
+    if context.cookies_from_browser:
+        args.extend(["--cookies-from-browser", context.cookies_from_browser])
+    if context.cookies_file:
+        args.extend(["--cookies", str(context.cookies_file)])
+    return args
+
+
 def process_videos(context: RunContext, urls: Iterable[str]) -> List[VideoProcessingResult]:
     results: List[VideoProcessingResult] = []
     for index, url in enumerate(urls, start=1):
@@ -122,11 +131,7 @@ def process_single_video(context: RunContext, url: str, index: int) -> VideoProc
 
 
 def fetch_metadata(url: str, context: RunContext, log_messages: List[str]) -> Optional[dict]:
-    cmd = [
-        "yt-dlp",
-        "-J",
-        url,
-    ]
+    cmd = build_ytdlp_base_args(context) + ["-J", url]
 
     last_error: Optional[str] = None
     for attempt in range(1, context.retries + 1):
@@ -285,8 +290,7 @@ def download_audio(
     log_messages: List[str],
 ) -> Optional[Path]:
     template = temp_dir / "%(id)s.%(ext)s"
-    cmd = [
-        "yt-dlp",
+    cmd = build_ytdlp_base_args(context) + [
         "--no-progress",
         "-f",
         "ba",

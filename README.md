@@ -10,6 +10,7 @@ Local-first CLI for collecting YouTube metadata, transcripts, and optional top c
 - When `YOUTUBE_API_KEY` is set, automatically pulls up to 20 top comments (overridable via `--comments`).
 - Writes a single human readable `.txt` report by default; add `--debug` to keep `.json` and `.log` companions.
 - Cleans up temporary audio automatically unless `--debug` is used to retain artefacts for troubleshooting.
+- Prints a pre-flight summary so you immediately see dependency status, comment defaults, and cookie sources.
 
 ## Prerequisites
 
@@ -67,6 +68,8 @@ Key options:
 - `--outdir /path/to/output` – override the default output directory (`~/Desktop`).
 - `--comments N` – limit the number of top comments (default 20 when `YOUTUBE_API_KEY` is set, 0 otherwise).
 - `--debug` – keep `.json`/`.log` artifacts and retain temporary audio on failures.
+- `--cookies-from-browser safari` – delegate auth to yt-dlp using cookies from the named browser.
+- `--cookies /path/to/cookies.txt` – provide an exported cookies file for protected videos.
 - `--lang-priority ru,en` – caption language preference order.
 - `--parakeet-model mlx-community/parakeet-tdt-0.6b-v3` – override the HF repository.
 - `--retries 5` – change retry count for network-bound operations.
@@ -87,6 +90,18 @@ PYTHONPATH=src youtube-auto-transcripts --stdin --comments 0 <<'EOF'
 https://www.youtube.com/watch?v=dQw4w9WgXcQ
 EOF
 ```
+
+## Handling protected videos
+
+If yt-dlp reports `Sign in to confirm you’re not a bot`, pass credentials through one of the new cookie options. Examples:
+
+```bash
+youtube-auto-transcripts --cookies-from-browser safari 'https://www.youtube.com/watch?v=ID'
+# or
+youtube-auto-transcripts --cookies ~/.config/yt-dlp/cookies.txt 'https://www.youtube.com/watch?v=ID'
+```
+
+When these flags are absent the CLI makes anonymous requests, which may fail on restricted or age-gated videos.
 
 ## Output layout
 

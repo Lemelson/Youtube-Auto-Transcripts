@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import List
@@ -58,6 +59,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Keep auxiliary artifacts (.json, .log) and temporary audio on failure",
     )
     parser.add_argument(
+        "--cookies-from-browser",
+        dest="cookies_from_browser",
+        help="Forward credentials to yt-dlp via --cookies-from-browser (e.g. safari,chrome)",
+    )
+    parser.add_argument(
+        "--cookies",
+        dest="cookies_file",
+        type=Path,
+        help="Path to a cookies.txt file to pass to yt-dlp",
+    )
+    parser.add_argument(
         "--lang-priority",
         dest="lang_priority",
         default="ru,en",
@@ -84,6 +96,8 @@ def validate_args(args: argparse.Namespace) -> None:
         raise SystemExit("--comments must be zero or a positive integer")
     if args.retries < 1:
         raise SystemExit("--retries must be >= 1")
+    if args.cookies_file and not args.cookies_file.exists():
+        raise SystemExit(f"--cookies file not found: {args.cookies_file}")
 
 
 def build_options(args: argparse.Namespace) -> CLIOptions:
@@ -107,6 +121,8 @@ def build_options(args: argparse.Namespace) -> CLIOptions:
         lang_priority=parse_lang_priority(args.lang_priority),
         parakeet_model=args.parakeet_model,
         debug=args.debug,
+        cookies_from_browser=args.cookies_from_browser,
+        cookies_file=args.cookies_file,
         retries=args.retries,
     )
 
@@ -123,6 +139,8 @@ def main(argv: List[str] | None = None) -> int:
         youtube_api_key=os.environ.get("YOUTUBE_API_KEY"),
     )
 
+    print_preflight_summary(context)
+
     results = process_videos(context, options.urls)
     artifacts = write_outputs(context, results)
 
@@ -134,5 +152,37 @@ def main(argv: List[str] | None = None) -> int:
     return 0
 
 
+def print_preflight_summary(context: RunContext) -> None:
+    dependencies = {
+        "yt-dlp": shutil.which("yt-dlp"),
+        "ffmpeg": shutil.which("ffmpeg"),
+        "parakeet-mlx": shutil.which("parakeet-mlx"),
+    }
+    print("Pre-flight checks:")
+    for name, path in dependencies.items():
+        status = "OK" if path else "MISSING"
+        detail = path or "not found in PATH"
+        print(f" - {name}: {status} ({detail})")
+
+    comment_info = (
+        f"defaulting to {context.comment_limit} comments"
+        if context.comment_limit > 0
+        else "comments disabled"
+    )
+    comment_reason = (
+        "YOUTUBE_API_KEY detected"
+        if context.comment_limit > 0
+        else "no YOUTUBE_API_KEY"
+    )
+    print(f" - comments: {comment_info} ({comment_reason})")
+    if context.cookies_from_browser:
+        print(
+            f" - yt-dlp cookies: from browser '{context.cookies_from_browser}'"
+        )
+    if context.cookies_file:
+        print(f" - yt-dlp cookies: file {context.cookies_file}")
+
+
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())
+

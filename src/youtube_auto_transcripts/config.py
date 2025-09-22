@@ -16,6 +16,8 @@ class CLIOptions:
     lang_priority: List[str]
     parakeet_model: str
     debug: bool
+    cookies_from_browser: Optional[str]
+    cookies_file: Optional[Path]
     retries: int = 3
 
 
@@ -82,6 +84,14 @@ class RunContext:
     @property
     def debug(self) -> bool:
         return self.options.debug
+
+    @property
+    def cookies_from_browser(self) -> Optional[str]:
+        return self.options.cookies_from_browser
+
+    @property
+    def cookies_file(self) -> Optional[Path]:
+        return self.options.cookies_file
 
 
 def parse_lang_priority(raw: str) -> List[str]:

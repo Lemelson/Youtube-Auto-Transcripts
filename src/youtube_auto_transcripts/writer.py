@@ -67,6 +67,34 @@ def render_text_report(results: List[VideoProcessingResult]) -> str:
         duration_text = str(duration) if duration is not None else "-1"
 
         transcript_text = result.transcript.text.strip() if result.transcript.text else "NO_TRANSCRIPT"
+        transcript_reason_lines: List[str] = []
+        if not result.transcript.text:
+            seen_errors = set()
+            seen_warnings = set()
+            if result.transcript.errors:
+                entries = [m for m in result.transcript.errors if m not in seen_errors]
+                seen_errors.update(entries)
+                if entries:
+                    transcript_reason_lines.append("Reason (errors):")
+                    transcript_reason_lines.extend(f"  - {message}" for message in entries)
+            if result.errors:
+                entries = [m for m in result.errors if m not in seen_errors]
+                seen_errors.update(entries)
+                if entries:
+                    transcript_reason_lines.append("Other errors:")
+                    transcript_reason_lines.extend(f"  - {message}" for message in entries)
+            if result.transcript.warnings:
+                entries = [m for m in result.transcript.warnings if m not in seen_warnings]
+                seen_warnings.update(entries)
+                if entries:
+                    transcript_reason_lines.append("Reason (warnings):")
+                    transcript_reason_lines.extend(f"  - {message}" for message in entries)
+            if result.warnings:
+                entries = [m for m in result.warnings if m not in seen_warnings]
+                seen_warnings.update(entries)
+                if entries:
+                    transcript_reason_lines.append("Other warnings:")
+                    transcript_reason_lines.extend(f"  - {message}" for message in entries)
 
         block_lines = [
             f"URL: {result.url}",
@@ -80,9 +108,15 @@ def render_text_report(results: List[VideoProcessingResult]) -> str:
             "",
             "Transcript:",
             transcript_text,
+        ]
+
+        if transcript_reason_lines:
+            block_lines.extend(transcript_reason_lines)
+
+        block_lines.extend([
             "",
             "TopComments:",
-        ]
+        ])
 
         if result.comments:
             for comment in result.comments:
